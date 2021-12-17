@@ -195,7 +195,8 @@ class WalletNFTHistory:
 
     #See https://www.kryptosekken.no/regnskap/importer-csv-generisk2
     def kryptosekkenTrades(self):
-        kryptosekkenTrades = PrettyTable(["Tidspunkt","Type","Inn","Inn-Valuta","Ut","Ut-Valuta","Gebyr","Gebyr-Valuta", "Marked","Notat"])
+        headers = ["Tidspunkt","Type","Inn","Inn-Valuta","Ut","Ut-Valuta","Gebyr","Gebyr-Valuta", "Marked","Notat"]
+        kryptosekkenTrades = PrettyTable(headers)
         kryptosekkenTrades.set_style(DOUBLE_BORDER)
         kryptosekkenTrades.float_format=".2"
         kryptosekkenTrades.reversesort=False
@@ -207,6 +208,12 @@ class WalletNFTHistory:
         
         print("Kryptosekken trades")
         print(kryptosekkenTrades)
+
+
+        trades = kryptosekkenTrades.rows
+        print(*headers,sep=",")
+        for trade in trades:
+            print(*trade,sep=",")
 
     def listNFTs(self):
         
