@@ -7,6 +7,7 @@ import json
 from colorama import init, Fore, Back, Style
 from datetime import datetime
 from prettytable import PrettyTable, DOUBLE_BORDER 
+import traceback
 
 class WalletNFTHistory: 
     wallet = None
@@ -119,8 +120,8 @@ class WalletNFTHistory:
             except BaseException as ex:
                 print("Failed parsing transaction")
                 print(ex)
+                print(traceback.format_exc())
                 print(json.dumps(openseaEvent,indent=4))
-                raise
     
     def _getNftsTradeByContract(self,nftsTraded):
         #New table grouped by contract - A bit messy so consider splitting in to new function
@@ -192,6 +193,21 @@ class WalletNFTHistory:
 
         return nftsHoldingByContract
 
+    #See https://www.kryptosekken.no/regnskap/importer-csv-generisk2
+    def kryptosekkenTrades(self):
+        kryptosekkenTrades = PrettyTable(["Tidspunkt","Type","Inn","Inn-Valuta","Ut","Ut-Valuta","Gebyr","Gebyr-Valuta", "Marked","Notat"])
+        kryptosekkenTrades.set_style(DOUBLE_BORDER)
+        kryptosekkenTrades.float_format=".2"
+        kryptosekkenTrades.reversesort=False
+        kryptosekkenTrades.align = "l"    
+
+        for nftKey in self.nfts:
+            nft = self.nfts[nftKey]
+            nft.addToKryptsekkenReport(kryptosekkenTrades,self.historicEthPrice)
+        
+        print("Kryptosekken trades")
+        print(kryptosekkenTrades)
+
     def listNFTs(self):
         
         #NFTs with both buy and sold transaction
@@ -203,32 +219,15 @@ class WalletNFTHistory:
         nftsTraded.float_format=".2"
         nftsTraded.sortby="Sell USD"
         nftsTraded.reversesort=True
-        nftsTraded.align = "l"
-
-        nftsHolding = PrettyTable(["NFT name","Bought","Days held","Buy USD","Buy ETH","Break-even ETH","Sales fee","Contract hash", "Contract name"])
-        nftsHolding.set_style(DOUBLE_BORDER)
-        nftsHolding.float_format=".2"
-        nftsHolding.sortby="Buy USD"
-        nftsHolding.reversesort=True
-        nftsHolding.align = "l"        
-
-        nftsOnlySold = PrettyTable(["NFT name","Sold","Profit","% profit","Sell USD","Buy USD"])
-        nftsOnlySold.set_style(DOUBLE_BORDER)
-        nftsOnlySold.float_format=".2"
-        nftsOnlySold.sortby="Sell USD"
-        nftsOnlySold.reversesort=True  
-        nftsOnlySold.align = "l"          
+        nftsTraded.align = "l"    
 
         hasNftsOnlySold=False
         for nftKey in self.nfts:
             nft = self.nfts[nftKey]
             nft.addToReport(nftsTraded,self.REPORT_PROFIT,self.historicEthPrice)
-            nft.addToReport(nftsHolding,self.REPORT_HOLDING,self.historicEthPrice)
-            nft.addToReport(nftsOnlySold,self.REPORT_ONLY_SOLD,self.historicEthPrice)
 
         #New table grouped by contract
         nftsTradedByContract=self._getNftsTradeByContract(nftsTraded)
-        nftsHoldingByContract=self._getNFTSHoldingByContract(nftsHolding)
         
 
         #Remove the contract related columns from nftsTraded
@@ -240,34 +239,6 @@ class WalletNFTHistory:
         print(nftsTraded)
         print("Profit pr contract")
         print(nftsTradedByContract)
-        #print("Total profits: {:.2f}".format(sumProfits))
-
-        #print("Profits (USD) {:.2f}".format(profits))
-        
-        #Remove the contract related columns from nftsTraded
-        nftsHolding.del_column('Contract hash')
-        nftsHolding.del_column('Contract name')
-        print("Currently holding:")
-        print(nftsHolding)
-        print(nftsHoldingByContract)
-        
-        if hasNftsOnlySold:
-            print("Missing buy transaction:")
-            #print("Total sell price where missing buy transaction {:.2f} USD".format(totalSoldMissingBuy))
-            print(nftsOnlySold)
-
-        sumProfits = 0.0
-        dataNFTSTraded= nftsTraded.rows
-        for row in dataNFTSTraded:
-            # Cannot use Profit USD field as it is a string due to coloring
-            #Using (sell USD-buy USD)
-            sumProfits += (row[5]-row[6])
-        print("Sum profits: {:.2f} USD".format(sumProfits))
-        sumBuyForUnsold = 0.0
-        dataNFTSHolding= nftsHolding.rows
-        for row in dataNFTSHolding:
-            sumBuyForUnsold += row[3]        
-        print("Sum buy price for unsold nfts: {:.2f} USD".format(sumBuyForUnsold))
 
         print("\nDisclaimer: These numbers are based on transaction available in the OpenSea API.\nThe prices usually contains minting and seller fees.\nPrices do not include transaction costs.\nThe numbers are not thoroughly vetted, so don't use as a basis for Tax reporting purposes.\nMade by elsewhat.eth - @dparnas")
 
@@ -323,6 +294,7 @@ class NFT:
             print("REQUEST: {}".format(transactionLookupURL))
             try:
                 response = requests.get(transactionLookupURL)
+                response.raise_for_status()
                 transactionLookup = response.json()
                 ethPrice = transactionLookup['total']*1.0e-18
                 if ethPrice > 0.0:
@@ -330,8 +302,8 @@ class NFT:
                     transaction.price = ethPrice
                     transaction.recalculateUSDPrice(walletNFTHistory.historicEthPrice)
             except requests.exceptions.HTTPError as error:
-                print(transactionLookup)
                 print(error)
+                     
 
             #self.__buyTransaction = transaction   
             self.__walletTransactions[0] = (transaction,existingSellTransaction)
@@ -444,7 +416,15 @@ class NFT:
             return [nftName,"{}".format(dateFirstBought.strftime('%Y-%m-%d')),daysHeld,totalBuyUSD, avgBuyEth, breakEven,salesFee,self.contractAddress,self.contractName]
         elif sellTransaction:
             #Does not handle multiple of the same nft held , but that's ok
-            return [self.nftName,"{}".format(sellTransaction.transactionDate.strftime('%Y-%m-%d')), '', '',sellTransaction.usdPrice,'']   
+            return [self.nftName,"{}".format(sellTransaction.transactionDate.strftime('%Y-%m-%d')), '', '',sellTransaction.usdPrice,'']
+
+    def addToKryptsekkenReport(self,prettyTableForReport,historicEthPrice):
+        buyTransaction,sellTransaction = self.__walletTransactions[0]
+
+        if buyTransaction and sellTransaction:
+            #["Tidspunkt","Type","Inn","Inn-Valuta","Ut","Ut-Valuta","Gebyr","Gebyr-Valuta", "Marked","Notat"])
+            prettyTableForReport.add_row([buyTransaction.transactionDate,'Handel',1.0,self.contractAddress+'-'+self.contractTokenId,buyTransaction.price,'ETH',0.0,'ETH','NFT BUY',self.nftName])
+            prettyTableForReport.add_row([sellTransaction.transactionDate,'Handel',sellTransaction.price,'ETH',1.0,self.contractAddress+'-'+self.contractTokenId,0.0,'ETH','NFT SELL',self.nftName])
 
 class Transaction:
     def __init__(self, transactionHash,transactionDate,transactionType, price,quantity,paymentToken, usdPrice, sellerFeeFactor, walletSeller, walletBuyer):
@@ -582,7 +562,8 @@ def main():
             # Additional code will only run if the request is successful
             offset+=300            
 
-        walletNFTHistory.listNFTs()            
+        walletNFTHistory.listNFTs()
+        walletNFTHistory.kryptosekkenTrades()
     except HTTPError as error:
         print(error)
         print(error.response.text())
