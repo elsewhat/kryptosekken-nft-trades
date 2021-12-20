@@ -8,6 +8,7 @@ from colorama import init, Fore, Back, Style
 from datetime import datetime
 from prettytable import PrettyTable, DOUBLE_BORDER 
 import traceback
+import hashlib
 
 class WalletNFTHistory: 
     wallet = None
@@ -425,13 +426,19 @@ class NFT:
             #Does not handle multiple of the same nft held , but that's ok
             return [self.nftName,"{}".format(sellTransaction.transactionDate.strftime('%Y-%m-%d')), '', '',sellTransaction.usdPrice,'']
 
+    def getKryptosekkenId(self):
+        hash = hashlib.sha1()
+        hash.update(str(self.contractAddress+'-'+self.contractTokenId).encode('utf-8'))
+        return hash.hexdigest()[:16]
+
     def addToKryptsekkenReport(self,prettyTableForReport,historicEthPrice):
         buyTransaction,sellTransaction = self.__walletTransactions[0]
+        translationTableNFTName = dict.fromkeys(map(ord, '’#|"'), None)
 
         if buyTransaction and sellTransaction:
             #["Tidspunkt","Type","Inn","Inn-Valuta","Ut","Ut-Valuta","Gebyr","Gebyr-Valuta", "Marked","Notat"])
-            prettyTableForReport.add_row([buyTransaction.transactionDate,'Handel',1.0,self.contractAddress+'-'+self.contractTokenId,buyTransaction.price,'ETH',0.0,'ETH','NFT BUY',self.nftName])
-            prettyTableForReport.add_row([sellTransaction.transactionDate,'Handel',sellTransaction.price,'ETH',1.0,self.contractAddress+'-'+self.contractTokenId,0.0,'ETH','NFT SELL',self.nftName])
+            prettyTableForReport.add_row([buyTransaction.transactionDate,'Handel',1.0,self.getKryptosekkenId(),buyTransaction.price,'ETH',0.0,'ETH','NFT BUY',self.nftName.translate(translationTableNFTName)])
+            prettyTableForReport.add_row([sellTransaction.transactionDate,'Handel',sellTransaction.price,'ETH',1.0,self.getKryptosekkenId(),0.0,'ETH','NFT SELL',self.nftName.translate(translationTableNFTName)])
 
 class Transaction:
     def __init__(self, transactionHash,transactionDate,transactionType, price,quantity,paymentToken, usdPrice, sellerFeeFactor, walletSeller, walletBuyer):
