@@ -1,5 +1,5 @@
 # kryptosekken-nft-trades
-Calculate proift loss related information for ERC721 and ERC1159 NFTs
+Calculate profit loss related information for ERC721 and ERC1159 NFTs and output in format compatible with kryptosekken.com
 
 
 ## Usage
