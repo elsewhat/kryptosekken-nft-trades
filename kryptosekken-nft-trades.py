@@ -439,6 +439,8 @@ class NFT:
             #["Tidspunkt","Type","Inn","Inn-Valuta","Ut","Ut-Valuta","Gebyr","Gebyr-Valuta", "Marked","Notat"])
             prettyTableForReport.add_row([buyTransaction.transactionDate,'Handel',1.0,self.getKryptosekkenId(),buyTransaction.price,'ETH',0.0,'ETH','NFT BUY',self.nftName.translate(translationTableNFTName)])
             prettyTableForReport.add_row([sellTransaction.transactionDate,'Handel',sellTransaction.price,'ETH',1.0,self.getKryptosekkenId(),0.0,'ETH','NFT SELL',self.nftName.translate(translationTableNFTName)])
+        elif buyTransaction:
+            prettyTableForReport.add_row([buyTransaction.transactionDate,'Handel',1.0,self.getKryptosekkenId(),buyTransaction.price,'ETH',0.0,'ETH','NFT BUY',self.nftName.translate(translationTableNFTName)])
 
 class Transaction:
     def __init__(self, transactionHash,transactionDate,transactionType, price,quantity,paymentToken, usdPrice, sellerFeeFactor, walletSeller, walletBuyer):
